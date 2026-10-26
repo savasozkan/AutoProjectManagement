@@ -1,0 +1,41 @@
+Master task: Step distillation for on-device image generation
+
+Goal
+
+- Cut the number of denoising steps a text-to-image generator needs, so it can produce high-quality images on mobile and edge hardware within tight latency, memory and energy budgets.
+- Recent work shows that 1–4 step generation is now achievable for modern flow-matching transformer (DiT) models.
+
+Literature baseline
+
+- SANA-Sprint (Chen et al., 2025)
+-- Converts a pretrained flow-matching model into TrigFlow form without retraining, which is what continuous-time consistency distillation (sCM) needs.
+-- Combines sCM with latent adversarial distillation (LADD) in one student that works at 1, 2 or 4 steps.
+-- Generates a 1024×1024 image in about 0.1 s on an H100 and 0.31 s on an RTX 4090.
+-- Needs a short teacher fine-tune (dense timestep embeddings, QK-normalisation) to keep training stable.
+
+- SiD-DiT (Zhou et al., 2025)
+-- Extends score identity distillation to flow-matching DiTs from 0.6B to 12B parameters (SANA, SD3/3.5, FLUX.1-dev).
+-- Uses one shared configuration, with no teacher fine-tuning and no real training images.
+-- Its 4-step students match or beat their teachers on FID and GenEval.
+-- Optional adversarial training on real data improves FID further.
+
+- Practical guide (Pu et al., 2025)
+-- Compares sCM and MeanFlow on an 8B FLUX.1-lite teacher.
+-- sCM stays close to teacher quality at 1–2 steps; MeanFlow needs about 4 steps but then gives sharper detail and stronger prompt alignment.
+-- Gives practical recipes, such as rescaling timesteps to [0, 1] and distilling from the teacher’s guided velocity, and releases open-source code.
+
+Gap: all three report results on datacenter or desktop GPUs. None measures on mobile or edge devices.
+
+Scope of work
+
+- Apply and compare these methods (sCM+LADD, SiD, MeanFlow) on compact, deployment-friendly teachers.
+- Choose the step count for each target device’s latency budget: 1–2 steps (favours sCM) or 4 steps (favours MeanFlow or SiD).
+- Make the students deployable:
+- quantisation-aware training (e.g. INT8/INT4)
+- operator and memory-layout optimisation for target NPUs/GPUs
+- conversion to on-device runtimes
+
+Evaluation
+
+- Quality: FID, CLIP score, GenEval/DPG-Bench, human preference studies.
+- Efficiency: per-image latency, peak memory and power draw on representative phones and edge devices.
