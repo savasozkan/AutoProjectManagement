@@ -19,7 +19,40 @@ Token permissions:
 The project number is in its URL: `github.com/users/<owner>/projects/<number>`
 (or `github.com/orgs/<org>/projects/<number>` — set `GITHUB_PROJECT_OWNER_TYPE=org`).
 
-## Web UI
+## Agent (chat UI)
+
+```bash
+task-agent ui            # then open http://127.0.0.1:8000
+```
+
+A chat with a project agent that remembers the conversation: the loaded document, the tasks you
+selected and the latest generated tasks. Attach a document with 📎 (or drag it in): it waits above
+the input box until you press **Send**, so you can add a description or a command first. On Send
+the document is read first, then your message runs. Guide the agent with special tokens:
+
+| Token | What the agent does |
+|---|---|
+| `[SEARCH]` | Finds tasks already in the project that relate to the document. `[SEARCH] payments` searches for that text instead. Results can be selected. |
+| `[TASK]` | Generates tasks for the document that don't overlap the selected tasks. Text after it is guidance. Selecting a master task puts the new tasks under it. `[UPDATE] #12` / `[DELETE] #12` work here too. **Asked again**, it doesn't generate anything new: it keeps the current tasks (with your edits) and only removes the ones that overlap the selected project tasks. `[TASK] regenerate` starts over. |
+| `[MERGE]` | Merges two or more generated tasks into one. Name them by number (`[MERGE] 2, 3`, text after the numbers guides the merged task: `[MERGE] 2, 3: one task for the API`) or describe them (`[MERGE] the testing and dashboard tasks`). The merged task takes the place of the first one; nothing else changes. |
+| `[SPLIT]` | Splits a generated task into smaller, meaningful tasks: `[SPLIT] 3`, `[SPLIT] 3: by platform` / `into 3 tasks`, or `[SPLIT] the mobile app task`. Parts never repeat other tasks in the list or the selected project tasks: overlapping parts are left out, and if fewer than two parts remain the task is kept as it was. |
+| `[ADD]` | Adds the generated tasks (with your edits and ticks) to GitHub, after a confirmation. |
+| `[HELP]` | Lists the commands. |
+
+You can load **several documents** in one conversation, e.g. the overall scope first and later
+updates. The agent keeps all of them and the tasks generated so far. A `[TASK]` after a new
+document *revises* the existing tasks instead of starting over: unaffected tasks are kept as they
+are (including your edits), affected ones are changed, tasks the update makes unnecessary are
+removed (with the reason), and new work becomes new tasks. Tasks the model skips without a reason
+are kept, so nothing is forgotten silently. Tasks already added with `[ADD]` in the conversation
+count as covered for later rounds.
+
+Text without a token is remembered as guidance for the next `[TASK]`. Several tokens can go in
+one message and run in order, e.g. `[SEARCH] [TASK] focus on the API`.
+
+The previous step-by-step page is still available at `/classic`.
+
+## Classic web UI (`/classic`)
 
 ```bash
 task-agent ui            # then open http://127.0.0.1:8000
@@ -168,7 +201,8 @@ when `.env` isn't filled in.
 - `task_agent/planner.py` – `TaskPlanner`: turns a description into subtasks with Ollama
 - `task_agent/documents.py` – reads .txt/.md/.pdf files; describes PDF drawings with a vision model
 - `task_agent/ollama.py` – small client for the local Ollama server
-- `task_agent/web.py` + `task_agent/static/index.html` – the web UI
+- `task_agent/agent.py` – the conversational agent and its `[SEARCH]` / `[TASK]` / `[ADD]` commands
+- `task_agent/web.py` + `task_agent/static/` – web server, chat UI (`index.html`) and classic UI (`classic.html`)
 - `task_agent/similarity.py` – finds existing project tasks similar to a document
 - `task_agent/operations.py` – reads `[UPDATE]` / `[DELETE]` commands and finds their tasks
 - `task_agent/workflow.py` – proposes all changes for review, then applies them

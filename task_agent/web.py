@@ -20,6 +20,7 @@ from flask import Flask, jsonify, request, send_from_directory
 from .client import GitHubError
 from .documents import DocumentError, load_document
 from . import workflow
+from .agent import Agent, Session
 from .planner import PlannerError, Subtask, TaskPlanner
 from .projects import ProjectItem, ProjectService
 from .similarity import SimilarityFinder, strength
@@ -71,9 +72,71 @@ def create_app(service: ProjectService) -> Flask:
     jobs = Jobs()
     github_lock = threading.Lock()  # one GitHub operation at a time
 
+    agent = Agent(service, github_lock=github_lock)
+    sessions: Dict[str, Session] = {}
+
     @app.get("/")
     def index():
         return send_from_directory(STATIC_DIR, "index.html")
+
+    @app.get("/classic")
+    def classic():
+        return send_from_directory(STATIC_DIR, "classic.html")
+
+    # -- Agent (chat) -----------------------------------------------------
+
+    def _session(session_id: Optional[str]) -> Optional[Session]:
+        return sessions.get(session_id or "")
+
+    @app.post("/api/agent/session")
+    def agent_session():
+        session = Session()
+        sessions[session.id] = session
+        return jsonify(session_id=session.id)
+
+    @app.post("/api/agent/document")
+    def agent_document():
+        session = _session(request.form.get("session_id"))
+        if session is None:
+            return jsonify(error="Unknown session. Reload the page."), 404
+        upload = request.files.get("file")
+        if not upload or not upload.filename:
+            return jsonify(error="Choose a .pdf, .txt or .md file."), 400
+        ext = os.path.splitext(upload.filename)[1].lower()
+        if ext not in ALLOWED_EXTENSIONS:
+            return jsonify(error=f"Unsupported file type '{ext}'. Use .pdf, .txt or .md."), 400
+        workdir = tempfile.mkdtemp(prefix="task-agent-")
+        path = os.path.join(workdir, "upload" + ext)
+        upload.save(path)
+        name = upload.filename
+        use_vision = request.form.get("use_vision", "true") == "true"
+
+        def work(log):
+            try:
+                with session.lock:
+                    log(f"Reading {name}...")
+                    doc = load_document(path, use_vision=use_vision, log=log)
+                    return {"replies": agent.document_loaded(session, name, doc)}
+            finally:
+                shutil.rmtree(workdir, ignore_errors=True)
+
+        return jsonify(job_id=jobs.start(work))
+
+    @app.post("/api/agent/message")
+    def agent_message():
+        data = request.get_json(silent=True) or {}
+        session = _session(data.get("session_id"))
+        if session is None:
+            return jsonify(error="Unknown session. Reload the page."), 404
+        text = str(data.get("text") or "")
+        selected = data.get("selected_ids")
+        edits = data.get("edits")
+
+        def work(log):
+            with session.lock:
+                return {"replies": agent.handle(session, text, selected, edits, log=log)}
+
+        return jsonify(job_id=jobs.start(work))
 
     @app.get("/api/config")
     def config():

@@ -170,3 +170,47 @@ def strength(score: float, method: str) -> str:
     if score >= possible:
         return "possible"
     return "weak"
+
+
+# A generated task "overlaps" an existing one at or above these scores. Calibrated on real pairs:
+# embeddings give 0.83-0.97 for the same work and <= 0.73 for different work.
+OVERLAP_THRESHOLD = {"embeddings": 0.78, "keywords": 0.45}
+
+
+def find_overlaps(
+    finder: "SimilarityFinder", tasks: Sequence[str], items: Sequence[ProjectItem]
+) -> List[Optional[Match]]:
+    """For each task text, the existing item it overlaps (best match above the threshold), or None."""
+    from .planner import _same_task  # title rule shared with the planner
+
+    candidates = [i for i in items if (i.title or "").strip()]
+    if not tasks or not candidates:
+        return [None] * len(tasks)
+
+    item_texts = [task_text(i) for i in candidates]
+    scores = None
+    if finder._use_embeddings:
+        try:
+            vectors = finder._ollama.embed(finder.embed_model, list(tasks) + item_texts)
+            task_vecs, item_vecs = vectors[: len(tasks)], vectors[len(tasks):]
+            scores = [[_cosine(t, v) for v in item_vecs] for t in task_vecs]
+            finder.method = "embeddings"
+        except OllamaError as exc:
+            finder._log(f"Embedding model unavailable ({exc}). Using keyword matching instead.")
+    if scores is None:
+        scores = [_tfidf_scores([t], item_texts) for t in tasks]  # one "chunk" per task
+        finder.method = "keywords"
+
+    threshold = OVERLAP_THRESHOLD[finder.method]
+    result: List[Optional[Match]] = []
+    for text, row in zip(tasks, scores):
+        best = max(range(len(candidates)), key=lambda k: row[k])
+        title = text.split("\n", 1)[0]
+        same_title = [k for k, item in enumerate(candidates) if _same_task(title, item.title)]
+        if row[best] >= threshold:
+            result.append(Match(candidates[best], round(row[best], 3)))
+        elif same_title:
+            result.append(Match(candidates[same_title[0]], round(row[same_title[0]], 3)))
+        else:
+            result.append(None)
+    return result

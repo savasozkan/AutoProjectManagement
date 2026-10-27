@@ -158,13 +158,15 @@ def apply(
             try:
                 if master:
                     result.created = service.add_to_master(master.content_id, list(new_tasks), repo, fields)
-                    result.master = {"number": master.number, "url": master.url, "title": master.title}
+                    result.master = {"number": master.number, "url": master.url, "title": master.title,
+                                     "item_id": master.id}
                     result.reused_master = True
                 else:
                     created, subs = service.add_plan(
                         Plan(master_title or "Master task", master_description, list(new_tasks)), repo, fields
                     )
-                    result.master = {"number": created.number, "url": created.url, "title": master_title}
+                    result.master = {"number": created.number, "url": created.url, "title": master_title,
+                                     "item_id": created.item_id}
                     result.created = subs
             except GitHubError as exc:
                 result.errors.append(f"Creating the new subtasks failed: {exc}")

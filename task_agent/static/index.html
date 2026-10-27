@@ -3,610 +3,612 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Task Agent</title>
+<title>Project Agent</title>
 <style>
   :root {
     --bg: #f6f7f9; --panel: #ffffff; --text: #1d2330; --muted: #667085; --border: #e3e6ec;
     --accent: #2f6feb; --accent-text: #ffffff; --accent-soft: #e8f0fe;
     --ok: #1a7f37; --ok-soft: #e6f4ea; --err: #c62828; --err-soft: #fdecea;
-    --warn: #9a6700; --warn-soft: #fff4d6; --row-off: #f2f3f5;
+    --warn: #9a6700; --warn-soft: #fff4d6; --row-off: #f2f3f5; --user: #2f6feb; --user-text: #fff;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #0f1218; --panel: #171b23; --text: #e6e9ef; --muted: #98a1b3; --border: #2a303c;
       --accent: #5b8def; --accent-text: #0b0e13; --accent-soft: #1d2a44;
       --ok: #4ac26b; --ok-soft: #14291b; --err: #ff6b6b; --err-soft: #3a1a1a;
-      --warn: #e3b341; --warn-soft: #2e2510; --row-off: #12161d;
+      --warn: #e3b341; --warn-soft: #2e2510; --row-off: #12161d; --user: #3d6fd8; --user-text: #fff;
     }
   }
   * { box-sizing: border-box; }
+  html, body { height: 100%; }
   body {
-    margin: 0; background: var(--bg); color: var(--text);
+    margin: 0; background: var(--bg); color: var(--text); display: flex; flex-direction: column;
     font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   }
-  main { max-width: 860px; margin: 0 auto; padding: 32px 16px 80px; }
-  header { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
-  h1 { font-size: 22px; margin: 0; }
-  h2 { font-size: 16px; margin: 0 0 6px; }
-  .lead { color: var(--muted); font-size: 14px; margin: 0 0 14px; }
+  a { color: var(--accent); }
+  header { background: var(--panel); border-bottom: 1px solid var(--border); }
+  .bar { max-width: 900px; margin: 0 auto; padding: 12px 16px; display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; justify-content: space-between; }
+  h1 { font-size: 18px; margin: 0; }
   .meta { color: var(--muted); font-size: 13px; }
   .meta a { color: inherit; }
-  a { color: var(--accent); }
 
-  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
-  .step { display: inline-flex; width: 22px; height: 22px; border-radius: 50%; background: var(--accent-soft); color: var(--accent);
-          font-size: 12px; font-weight: 600; align-items: center; justify-content: center; margin-right: 8px; }
+  /* What the agent currently remembers */
+  .context { max-width: 900px; margin: 0 auto; padding: 0 16px 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .pill { font-size: 12.5px; padding: 3px 10px; border-radius: 999px; background: var(--row-off); color: var(--muted); border: 1px solid var(--border); }
+  .pill.on { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+  .pill button { border: none; background: none; color: inherit; padding: 0 0 0 6px; cursor: pointer; font: inherit; }
 
-  .drop { border: 2px dashed var(--border); border-radius: 10px; padding: 28px 16px; text-align: center; cursor: pointer; transition: .15s; }
-  .drop:hover, .drop.over { border-color: var(--accent); background: var(--accent-soft); }
-  .drop strong { display: block; margin-bottom: 4px; }
-  .drop input { display: none; }
+  main { flex: 1; overflow-y: auto; }
+  #log { max-width: 900px; margin: 0 auto; padding: 20px 16px 24px; display: flex; flex-direction: column; gap: 14px; }
 
-  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; margin-top: 16px; }
-  .row > label { flex: 1 1 200px; }
-  label { display: block; font-size: 13px; color: var(--muted); }
-  label.inline { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 14px; flex: 0 0 auto; }
-  input[type=text], input[type=number], textarea, select {
-    width: 100%; margin-top: 4px; padding: 8px 10px; font: inherit; color: var(--text);
-    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
-  }
-  input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
-  textarea { resize: vertical; min-height: 60px; }
-  input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; flex: none; }
+  .msg { display: flex; gap: 10px; max-width: 100%; }
+  .msg.user { justify-content: flex-end; }
+  .avatar { flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--accent-soft); color: var(--accent);
+            display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; }
+  .bubble { padding: 10px 14px; border-radius: 14px; max-width: 100%; overflow-wrap: anywhere; }
+  .user .bubble { background: var(--user); color: var(--user-text); border-bottom-right-radius: 4px; max-width: 80%; white-space: pre-wrap; }
+  .agent .bubble { background: var(--panel); border: 1px solid var(--border); border-top-left-radius: 4px; flex: 1; min-width: 0; }
+  .agent.error .bubble { background: var(--err-soft); color: var(--err); border-color: transparent; }
+  .token { display: inline-block; font-size: 12px; font-weight: 700; padding: 0 6px; border-radius: 6px; background: rgba(255,255,255,.22); }
+  .bubble ul { margin: 6px 0 0; padding-left: 20px; }
+  .bubble code { font-size: 13px; background: var(--row-off); padding: 1px 5px; border-radius: 4px; }
+  .bubble p { margin: 0; }
 
-  button { font: inherit; border-radius: 8px; padding: 9px 16px; cursor: pointer; border: 1px solid var(--border); background: var(--panel); color: var(--text); }
-  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
-  button:disabled { opacity: .5; cursor: not-allowed; }
-  button.link { border: none; background: none; padding: 4px 6px; color: var(--accent); }
-
-  .progress { margin-top: 14px; font-size: 13px; color: var(--muted); }
+  .progress { font-size: 13px; color: var(--muted); }
   .progress div::before { content: "✓ "; color: var(--ok); }
   .progress div.live::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 6px;
     border: 2px solid var(--accent); border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  .msg { margin-top: 14px; padding: 10px 12px; border-radius: 8px; font-size: 14px; white-space: pre-wrap; }
-  .msg.err { background: var(--err-soft); color: var(--err); }
-  .msg.ok { background: var(--ok-soft); color: var(--ok); white-space: normal; }
-
-  .toolbar { display: flex; justify-content: space-between; align-items: center; margin: 8px 0; flex-wrap: wrap; gap: 8px; }
-  .count { font-size: 13px; color: var(--muted); }
-
-  /* Rows used for both existing tasks and generated subtasks */
-  .item { display: flex; gap: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; align-items: flex-start; }
+  /* Cards inside agent messages */
+  .items { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+  .item { display: flex; gap: 10px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 10px; align-items: flex-start; background: var(--bg); }
   .item.picked { border-color: var(--accent); background: var(--accent-soft); }
-  .item.off { background: var(--row-off); }
   .item.off .fields { opacity: .5; }
   .item input[type=checkbox] { margin-top: 3px; }
-  .item .fields { flex: 1; min-width: 0; }
-  .item .title { font-weight: 600; overflow-wrap: anywhere; }
-  .item .sub { font-size: 13px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
-  .item .body { font-size: 13px; color: var(--muted); margin-top: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; margin-left: 6px; vertical-align: 1px; }
+  .fields { flex: 1; min-width: 0; }
+  .title { font-weight: 600; }
+  .sub { font-size: 12.5px; color: var(--muted); }
+  .snippet { font-size: 12.5px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 2px; }
+  .badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 0 7px; border-radius: 999px; margin-left: 6px; vertical-align: 1px; background: var(--row-off); color: var(--muted); }
   .badge.strong { background: var(--ok-soft); color: var(--ok); }
   .badge.possible { background: var(--warn-soft); color: var(--warn); }
-  .badge.weak { background: var(--row-off); color: var(--muted); }
   .badge.master { background: var(--accent-soft); color: var(--accent); }
-  .notice { margin-top: 10px; padding: 10px 12px; border-radius: 8px; font-size: 14px; background: var(--accent-soft); }
-  .warnings { margin: 0 0 14px; padding: 10px 12px 10px 30px; border-radius: 8px; background: var(--warn-soft); color: var(--warn); font-size: 14px; }
-  .warnings li { margin: 2px 0; }
-  h3 { font-size: 14px; margin: 22px 0 8px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-  h3 .count { font-weight: 400; }
-  .item.change { flex-wrap: nowrap; }
-  .item.update { border-left: 3px solid var(--accent); }
+  .section { font-size: 13px; font-weight: 700; margin: 14px 0 0; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+  .warnings { margin: 10px 0 0; padding: 8px 10px 8px 26px; border-radius: 8px; background: var(--warn-soft); color: var(--warn); font-size: 13.5px; }
+  .notice { margin-top: 10px; padding: 8px 10px; border-radius: 8px; background: var(--accent-soft); font-size: 13.5px; }
+  .old { font-size: 12.5px; color: var(--muted); margin: 4px 0; padding: 5px 8px; background: var(--row-off); border-radius: 6px; white-space: pre-wrap; max-height: 6em; overflow: auto; }
   .item.delete { border-left: 3px solid var(--err); }
-  .item.delete .title { color: var(--err); }
-  .item.delete.off .title { color: var(--text); }
-  .old { font-size: 13px; color: var(--muted); margin: 6px 0; padding: 6px 8px; background: var(--row-off); border-radius: 6px; white-space: pre-wrap; max-height: 7.5em; overflow: auto; }
-  .old b { font-weight: 600; }
-  .fields .label { font-size: 12px; color: var(--muted); margin-top: 8px; }
-  .item select { width: auto; margin-top: 8px; font-size: 13px; padding: 5px 8px; }
-  code { font-size: 13px; background: var(--row-off); padding: 1px 5px; border-radius: 4px; }
-  .badge.status { background: var(--row-off); color: var(--muted); font-weight: 500; }
+  .item.update { border-left: 3px solid var(--accent); }
+  input[type=text], textarea, select {
+    width: 100%; padding: 6px 9px; font: inherit; color: var(--text); background: var(--panel);
+    border: 1px solid var(--border); border-radius: 7px;
+  }
+  .fields input[type=text] { font-weight: 600; }
+  .fields textarea { margin-top: 5px; font-size: 13.5px; resize: vertical; min-height: 40px; }
+  .fields select { width: auto; margin-top: 6px; font-size: 13px; }
+  input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--accent); margin: 0; flex: none; }
+  button { font: inherit; border-radius: 8px; padding: 8px 14px; cursor: pointer; border: 1px solid var(--border); background: var(--panel); color: var(--text); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+  button.link { border: none; background: none; padding: 2px 4px; color: var(--accent); font-size: 13px; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .card-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
+  .stale { opacity: .55; }
+  .stale input, .stale textarea, .stale select, .stale button { pointer-events: none; }
+  .stale-note { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .results li { margin: 2px 0; }
+  .removed { margin: 6px 0 0; padding-left: 20px; font-size: 13.5px; }
+  .num { flex: none; width: 18px; text-align: right; color: var(--muted); font-size: 13px; font-weight: 600; padding-top: 6px; }
+  .removed s { color: var(--muted); }
 
-  .task .num { color: var(--muted); font-size: 13px; width: 20px; padding-top: 7px; text-align: right; flex: none; }
-  .task input[type=checkbox] { margin-top: 9px; }
-  .task .fields input { margin-top: 0; font-weight: 600; }
-  .task .fields textarea { margin-top: 6px; min-height: 44px; font-size: 14px; }
-  .task .remove { color: var(--muted); padding-top: 6px; }
-
-  .empty { padding: 16px; text-align: center; color: var(--muted); font-size: 14px; border: 1px dashed var(--border); border-radius: 10px; }
-  .results li { margin-bottom: 4px; }
+  /* Composer */
+  footer { background: var(--panel); border-top: 1px solid var(--border); }
+  .composer { max-width: 900px; margin: 0 auto; padding: 10px 16px 14px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; align-items: center; }
+  .chip { font-size: 12.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg); color: var(--accent); cursor: pointer; }
+  .chip:hover { background: var(--accent-soft); }
+  .chips .hint { font-size: 12.5px; color: var(--muted); margin-left: auto; }
+  .row { display: flex; gap: 8px; align-items: flex-end; }
+  #input { flex: 1; min-height: 44px; max-height: 180px; resize: none; padding: 10px 12px; border-radius: 10px; font-size: 15px; background: var(--bg); }
+  .attach { padding: 9px 12px; font-size: 16px; line-height: 1; }
+  #file { display: none; }
+  .attachment { display: inline-flex; align-items: center; gap: 4px; margin-bottom: 8px; padding: 4px 6px 4px 10px;
+                border-radius: 8px; background: var(--accent-soft); color: var(--accent); font-size: 13.5px; }
+  .attachment .link { font-size: 14px; padding: 0 4px; }
   .hidden { display: none !important; }
-  details summary { cursor: pointer; font-size: 13px; color: var(--muted); margin-top: 10px; }
+  .vision { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
 </style>
 </head>
 <body>
-<main>
-  <header>
-    <h1>Task Agent</h1>
-    <div class="meta" id="meta">Connecting to GitHub…</div>
-  </header>
+<header>
+  <div class="bar">
+    <h1>Project Agent</h1>
+    <div class="meta"><span id="meta">Connecting to GitHub…</span> · <a href="/classic">Classic view</a></div>
+  </div>
+  <div class="context">
+    <span class="pill" id="ctx-doc">No document</span>
+    <span class="pill" id="ctx-selected">0 tasks selected</span>
+    <span class="pill" id="ctx-proposal">No generated tasks</span>
+  </div>
+</header>
 
-  <!-- 1. Load -->
-  <section class="card">
-    <h2><span class="step">1</span>Load a document</h2>
-    <p class="lead">The text and any drawings are read, then compared with the tasks already in your project.</p>
-    <label class="drop" id="drop">
+<main id="scroller"><div id="log"></div></main>
+
+<footer>
+  <div class="composer">
+    <div class="chips">
+      <button class="chip" data-token="[SEARCH]" title="Find related tasks already in the project">[SEARCH]</button>
+      <button class="chip" data-token="[TASK]" title="Generate tasks that don't overlap the selected ones">[TASK]</button>
+      <button class="chip" data-token="[MERGE]" title="Merge generated tasks, e.g. [MERGE] 2, 3">[MERGE]</button>
+      <button class="chip" data-token="[SPLIT]" title="Split a generated task, e.g. [SPLIT] 3: by platform">[SPLIT]</button>
+      <button class="chip" data-token="[ADD]" title="Add the generated tasks to GitHub">[ADD]</button>
+      <button class="chip" data-token="[HELP]" title="List the commands">[HELP]</button>
+      <label class="vision"><input type="checkbox" id="use-vision" checked> Read drawings in PDFs</label>
+      <span class="hint">[TASK] again refines · [MERGE] 2, 3 · [SPLIT] 4 · Enter to send</span>
+    </div>
+    <div class="attachment hidden" id="attachment">
+      <span id="attachment-name"></span>
+      <button class="link" id="attachment-remove" title="Remove the file">✕</button>
+    </div>
+    <div class="row">
+      <button class="attach" id="attach" title="Attach a PDF or text file (sent with your next message)">📎</button>
       <input type="file" id="file" accept=".pdf,.txt,.md">
-      <strong id="file-name">Drop a PDF or text file here</strong>
-      <span class="meta">or click to choose (.pdf, .txt, .md)</span>
-    </label>
-    <div class="row" style="align-items:center">
-      <label class="inline"><input type="checkbox" id="use-vision" checked> Read drawings in PDFs</label>
-      <span style="flex:1"></span>
-      <button class="primary" id="read" disabled>Read document</button>
+      <textarea id="input" rows="1" placeholder="Attach a document with 📎 and/or write a message, e.g. [TASK] focus on the API… then press Send"></textarea>
+      <button class="primary" id="send">Send</button>
     </div>
-    <div class="progress" id="read-progress"></div>
-    <div class="msg err hidden" id="read-error"></div>
-  </section>
-
-  <!-- 2. Existing tasks -->
-  <section class="card hidden" id="existing-card">
-    <h2><span class="step">2</span>Tasks already in the project</h2>
-    <p class="lead">Tick the tasks that already cover part of this document. No new subtasks will be generated for that work.</p>
-    <div class="toolbar">
-      <span class="count" id="existing-count"></span>
-      <button class="link" id="toggle-weak"></button>
-    </div>
-    <div id="existing"></div>
-    <div class="notice hidden" id="master-hint"></div>
-  </section>
-
-  <!-- 3. Instructions -->
-  <section class="card hidden" id="instructions-card">
-    <h2><span class="step">3</span>Instructions</h2>
-    <p class="lead">Optional. Tell the planner what to emphasize, how detailed to be, or what to skip.
-      To change existing tasks, add a line per task:<br>
-      <code>[UPDATE] task name or #number</code> rewrites that task from the document and these instructions ·
-      <code>[DELETE] task name or #number</code> removes it. This only works for tasks you ticked in step 2 that
-      aren't done yet. You review every change before anything is changed on GitHub.</p>
-    <textarea id="prompt" rows="4" placeholder="Focus on the backend API and database.&#10;[UPDATE] Implement kitchen dashboard&#10;[DELETE] #34"></textarea>
-    <div class="row">
-      <label>Master task title (optional)
-        <input type="text" id="title" placeholder="Taken from the file, or suggested by the model">
-      </label>
-      <label style="flex: 0 0 120px">Max subtasks
-        <input type="number" id="max-tasks" min="1" max="25" value="10">
-      </label>
-      <label class="inline"><input type="checkbox" id="generate-new" checked> Also generate new subtasks</label>
-      <button class="primary" id="generate">Prepare changes</button>
-    </div>
-    <div class="progress" id="plan-progress"></div>
-    <div class="msg err hidden" id="plan-error"></div>
-  </section>
-
-  <!-- 4. Review -->
-  <section class="card hidden" id="review">
-    <h2><span class="step">4</span>Review new subtasks</h2>
-    <p class="lead">Untick anything you don't want. Nothing changes on GitHub until step 5.</p>
-    <ul class="warnings hidden" id="warnings"></ul>
-
-    <div id="updates-box" class="hidden">
-      <h3>Tasks to update <span class="count" id="update-count"></span></h3>
-      <div id="updates"></div>
-    </div>
-    <div id="deletions-box" class="hidden">
-      <h3>Tasks to delete <span class="count" id="delete-count"></span></h3>
-      <div id="deletions"></div>
-    </div>
-
-    <h3 id="new-heading">New subtasks</h3>
-    <div class="notice hidden" id="existing-master-box"></div>
-    <div id="new-master-box">
-      <label>Master task
-        <input type="text" id="master-title">
-      </label>
-      <details>
-        <summary>Master task description</summary>
-        <textarea id="master-description" rows="8"></textarea>
-      </details>
-    </div>
-    <div class="toolbar" style="margin-top:18px">
-      <div>
-        <button class="link" id="select-all">Select all</button>
-        <button class="link" id="select-none">Select none</button>
-        <button class="link" id="add-task">+ Add subtask</button>
-      </div>
-      <span class="count" id="task-count"></span>
-    </div>
-    <div id="tasks"></div>
-    <p class="meta">Not quite right? Change the selection in step 2 or the instructions in step 3 and prepare the changes again.</p>
-  </section>
-
-  <!-- 5. Publish -->
-  <section class="card hidden" id="publish">
-    <h2><span class="step">5</span>Apply to GitHub</h2>
-    <p class="lead" id="publish-lead"></p>
-    <div class="row">
-      <label>Repository
-        <input type="text" id="repo" placeholder="owner/name">
-      </label>
-      <label id="status-wrap" class="hidden" style="flex: 0 0 180px">Status
-        <select id="status"><option value="">(leave empty)</option></select>
-      </label>
-      <button class="primary" id="create" disabled>Apply to GitHub</button>
-    </div>
-    <div class="msg err hidden" id="create-error"></div>
-    <div class="msg ok hidden" id="create-result"></div>
-  </section>
-</main>
+  </div>
+</footer>
 
 <script>
 const $ = (id) => document.getElementById(id);
-let selectedFile = null;
-let documentData = null;   // result of /api/read
-let matches = [];          // existing tasks, best match first; each gets .picked
-let showWeak = false;
-let tasks = [];            // generated subtasks: {title, description, selected}
-let existingMaster = null; // ticked master issue the new subtasks go under
-let useExistingMaster = false;
-let updates = [];          // [UPDATE] proposals: {item_id, number, url, old_title, old_description, title, description, selected}
-let deletions = [];        // [DELETE] proposals: {item_id, number, url, title, type, sub_issue_count, mode, selected}
+let sessionId = null;
+let busy = false;
+const documents = [];         // names of the documents loaded so far (first = scope, later = updates)
+const selected = new Map();   // item_id -> {number, title}: tasks the user selected as already covering work
+let latestProposal = null;    // {data, el, state} for the newest [TASK] result
+const MODE_TEXT = { delete: "deleted permanently", close: "closed", remove: "removed from the project" };
 
-// ---------- setup ----------
+// ---------- startup ----------
 fetch("/api/config").then(r => r.json()).then(cfg => {
-  if (cfg.error) { $("meta").textContent = "GitHub: " + cfg.error; return; }
-  $("meta").innerHTML = `Project: <a href="${cfg.project.url}" target="_blank" rel="noopener">${esc(cfg.project.title)}</a> · Model: ${esc(cfg.model)}`;
-  if (cfg.repo) $("repo").value = cfg.repo;
-  if (cfg.statuses.length) {
-    $("status-wrap").classList.remove("hidden");
-    for (const s of cfg.statuses) $("status").add(new Option(s, s));
+  $("meta").innerHTML = cfg.error ? esc("GitHub: " + cfg.error)
+    : `Project: <a href="${cfg.project.url}" target="_blank" rel="noopener">${esc(cfg.project.title)}</a>` +
+      (cfg.repo ? ` · Repo: ${esc(cfg.repo)}` : "");
+}).catch(() => { $("meta").textContent = "Can't reach the server."; });
+
+postJson("/api/agent/session", {}).then(r => {
+  sessionId = r.session_id;
+  agentMessage({ type: "text", text:
+    "Hi! I'm your project agent. Attach a document with 📎 (it's read when you press Send, together with anything you write), then guide me with commands:\n" +
+    "- **[SEARCH]** find related tasks already in the project (add text to search for something specific)\n" +
+    "- **[TASK]** generate new tasks that don't overlap the tasks you select (add text for guidance)\n" +
+    "- **[MERGE]** merge generated tasks into one, e.g. [MERGE] 2, 3 or [MERGE] the two API tasks\n" +
+    "- **[SPLIT]** split a generated task into smaller ones, e.g. [SPLIT] 3: by platform\n" +
+    "- **[ADD]** add the generated tasks to GitHub\n" +
+    "Anything without a command is remembered as guidance for [TASK]." });
+});
+
+// ---------- composer ----------
+const input = $("input");
+input.addEventListener("input", autosize);
+input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+});
+$("send").addEventListener("click", () => send());
+document.querySelectorAll(".chip").forEach(chip => chip.addEventListener("click", () => {
+  const t = chip.dataset.token;
+  const pos = input.selectionStart ?? input.value.length;
+  const before = input.value.slice(0, pos), after = input.value.slice(pos);
+  const pad = before && !before.endsWith(" ") && !before.endsWith("\n") ? " " : "";
+  input.value = before + pad + t + " " + after;
+  input.focus();
+  input.selectionStart = input.selectionEnd = (before + pad + t + " ").length;
+  autosize();
+}));
+$("attach").addEventListener("click", () => $("file").click());
+$("file").addEventListener("change", (e) => { const f = e.target.files[0]; e.target.value = ""; if (f) stageFile(f); });
+document.addEventListener("dragover", (e) => e.preventDefault());
+document.addEventListener("drop", (e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) stageFile(f); });
+$("attachment-remove").addEventListener("click", () => stageFile(null));
+
+// A file waits here until the user presses Send, so they can add a description or command first.
+let pendingFile = null;
+function stageFile(file) {
+  if (busy) return;
+  if (file && !/\.(pdf|txt|md)$/i.test(file.name)) {
+    agentMessage({ type: "error", text: `I can read .pdf, .txt and .md files, not ${file.name}.` });
+    return;
   }
-}).catch(() => { $("meta").textContent = "Can't reach the task-agent server."; });
-
-// ---------- 1. load + read ----------
-const drop = $("drop");
-$("file").addEventListener("change", (e) => pickFile(e.target.files[0]));
-drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
-drop.addEventListener("dragleave", () => drop.classList.remove("over"));
-drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("over"); pickFile(e.dataTransfer.files[0]); });
-
-function pickFile(file) {
-  if (!file) return;
-  selectedFile = file;
-  $("file-name").textContent = `${file.name}  (${Math.max(1, Math.round(file.size / 1024))} KB)`;
-  $("read").disabled = false;
+  pendingFile = file;
+  $("attachment").classList.toggle("hidden", !file);
+  $("attachment-name").textContent = file ? `📄 ${file.name} (${Math.max(1, Math.round(file.size / 1024))} KB) · read when you press Send` : "";
+  input.focus();
 }
 
-$("read").addEventListener("click", async () => {
-  if (!selectedFile) return;
-  hide("read-error"); $("read-progress").innerHTML = "";
-  ["existing-card", "instructions-card", "review", "publish"].forEach(hide);
-  busy("read", "Reading…");
+function autosize() { input.style.height = "auto"; input.style.height = Math.min(180, input.scrollHeight) + "px"; }
 
+function setBusy(on) {
+  busy = on;
+  $("send").disabled = on; $("attach").disabled = on; $("attachment-remove").disabled = on;
+}
+
+async function loadDocument(file) {
   const form = new FormData();
-  form.append("file", selectedFile);
+  form.append("session_id", sessionId);
+  form.append("file", file);
   form.append("use_vision", $("use-vision").checked ? "true" : "false");
+  return runJob(() => postForm("/api/agent/document", form), () => { documents.push(file.name); updateContext(); });
+}
+
+async function send({ withFile = true } = {}) {
+  const text = input.value.trim();
+  const file = withFile ? pendingFile : null;
+  if ((!text && !file) || busy || !sessionId) return;
+  const adding = /\[ADD\]/i.test(text);
+  let edits = null;
+  const refining = /\[(TASKS?|MERGE|SPLIT)\]/i.test(text);
+  if ((adding || refining) && latestProposal && !latestProposal.stale) {
+    // Send the tasks as they are on screen (edits, ticks) so [TASK] refines and [ADD] adds those.
+    edits = collectEdits(latestProposal);
+    // "[TASK] ... [ADD]" in one message adds the refined tasks; confirm only a direct [ADD].
+    const summary = adding && !refining ? describeEdits(edits) : "";
+    if (summary && !confirm(`Apply these changes to GitHub?\n\n${summary}`)) return;
+  }
+  input.value = ""; autosize();
+  if (file) stageFile(null);
+  userMessage([file ? `📄 ${file.name}` : "", text].filter(Boolean).join("\n"));
+  setBusy(true);
   try {
-    const { job_id } = await postForm("/api/read", form);
-    documentData = await pollJob(job_id, "read-progress");
-    matches = documentData.matches.map(m => ({ ...m, picked: false }));
-    showWeak = false;
-    renderExisting();
-    show("existing-card"); show("instructions-card");
-    $("existing-card").scrollIntoView({ behavior: "smooth", block: "start" });
-  } catch (err) {
-    showError("read-error", err.message);
-  } finally {
-    idle("read", "Read document");
-  }
-});
-
-// ---------- 2. existing tasks ----------
-function renderExisting() {
-  const list = $("existing");
-  const relevant = matches.filter(m => m.strength !== "weak");
-  const visible = showWeak ? matches : relevant.length ? relevant : [];
-  const hiddenCount = matches.length - visible.length;
-
-  list.innerHTML = "";
-  if (!matches.length) {
-    list.innerHTML = `<div class="empty">The project has no tasks yet, so everything will be generated.</div>`;
-  } else if (!visible.length) {
-    list.innerHTML = `<div class="empty">No similar tasks found in the project.</div>`;
-  }
-  for (const m of visible) {
-    const row = document.createElement("label");
-    row.className = "item" + (m.picked ? " picked" : "");
-    const ref = m.number ? `#${m.number}` : "draft";
-    const link = m.url ? `<a href="${m.url}" target="_blank" rel="noopener">${ref}</a>` : ref;
-    const isDone = (m.values && (m.values.Status || "").toLowerCase() === "done") || m.state === "CLOSED" || m.state === "MERGED";
-    const status = m.values && m.values.Status ? `<span class="badge status">${esc(m.values.Status)}</span>` : "";
-    const doneNote = isDone ? `<span class="badge weak" title="Done tasks can't be updated or deleted">done · read-only</span>` : "";
-    const state = m.state && m.state !== "OPEN" ? ` · ${m.state.toLowerCase()}` : "";
-    const parent = m.parent ? ` · sub-issue of #${m.parent.number}` : "";
-    const master = m.sub_issue_count ? `<span class="badge master">master · ${m.sub_issue_count} sub-issue${m.sub_issue_count === 1 ? "" : "s"}</span>` : "";
-    row.innerHTML = `
-      <input type="checkbox" ${m.picked ? "checked" : ""}>
-      <div class="fields">
-        <div class="title">${esc(m.title)}<span class="badge ${m.strength}">${m.strength} match</span>${master}${status}${doneNote}</div>
-        <div class="sub">${link}${state}${parent}</div>
-        ${m.body ? `<div class="body">${esc(m.body)}</div>` : ""}
-      </div>`;
-    row.querySelector("input").addEventListener("change", (e) => {
-      m.picked = e.target.checked;
-      row.classList.toggle("picked", m.picked);
-      updateExistingCount();
-    });
-    list.appendChild(row);
-  }
-
-  $("toggle-weak").textContent = showWeak ? "Show only similar tasks"
-    : hiddenCount ? `Show all ${matches.length} project tasks` : "";
-  $("toggle-weak").classList.toggle("hidden", !showWeak && !hiddenCount);
-  updateExistingCount();
-}
-
-$("toggle-weak").addEventListener("click", () => { showWeak = !showWeak; renderExisting(); });
-
-function picked() { return matches.filter(m => m.picked); }
-
-function updateMasterHint() {
-  const masters = picked().filter(m => m.sub_issue_count);
-  const hint = $("master-hint");
-  if (!masters.length) { hint.classList.add("hidden"); return; }
-  const m = masters[0];
-  hint.innerHTML = `New subtasks will be added under the existing master <b>#${m.number} ${esc(m.title)}</b> instead of a new master. ` +
-    `Its ${m.sub_issue_count} existing sub-issue(s) count as already covered.` +
-    (masters.length > 1 ? ` (More than one master is ticked; the first one is used.)` : "");
-  hint.classList.remove("hidden");
-}
-
-function updateExistingCount() {
-  updateMasterHint();
-  const similar = matches.filter(m => m.strength !== "weak").length;
-  const how = documentData && documentData.method === "keywords" ? " (keyword matching)" : "";
-  $("existing-count").textContent =
-    `${similar} similar of ${matches.length} in the project${how} · ${picked().length} ticked as already covered`;
-}
-
-// ---------- 3. prepare changes ----------
-$("generate").addEventListener("click", async () => {
-  if (!documentData) return;
-  hide("plan-error"); $("plan-progress").innerHTML = "";
-  if ((tasks.length || updates.length || deletions.length) &&
-      !confirm("Replace the current proposed changes (including your edits) with new ones?")) return;
-  busy("generate", "Preparing…");
-  try {
-    const { job_id } = await postJson("/api/plan", {
-      document_text: documentData.document_text,
-      document_title: documentData.document_title,
-      title: $("title").value,
-      max_tasks: $("max-tasks").value,
-      prompt: $("prompt").value,
-      existing_ids: picked().map(m => m.id),
-      generate_new: $("generate-new").checked,
-    });
-    showPlan(await pollJob(job_id, "plan-progress"));
-  } catch (err) {
-    showError("plan-error", err.message);
-  } finally {
-    idle("generate", "Prepare changes");
-  }
-});
-
-// ---------- 4. review ----------
-function showPlan(plan) {
-  $("master-title").value = plan.master_title;
-  $("master-description").value = plan.master_description;
-  existingMaster = plan.existing_master;
-  useExistingMaster = !!existingMaster;
-  tasks = plan.tasks.map(t => ({ ...t, selected: true }));
-  updates = plan.updates.map(u => ({ ...u, selected: true }));
-  deletions = plan.deletions.map(d => ({ ...d, selected: true, mode: d.type === "ISSUE" ? "delete" : "remove" }));
-
-  const warn = $("warnings");
-  warn.innerHTML = plan.warnings.map(w => `<li>${esc(w)}</li>`).join("");
-  warn.classList.toggle("hidden", !plan.warnings.length);
-
-  show("review"); show("publish"); hide("create-result"); hide("create-error");
-  renderUpdates(); renderDeletions(); renderTasks(); renderMasterChoice();
-  $("review").scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
-const refLink = (x) => x.url ? `<a href="${x.url}" target="_blank" rel="noopener">${x.number ? "#" + x.number : "draft"}</a>` : (x.number ? "#" + x.number : "draft");
-
-function renderUpdates() {
-  const list = $("updates");
-  list.innerHTML = "";
-  $("updates-box").classList.toggle("hidden", !updates.length);
-  updates.forEach((u) => {
-    const row = document.createElement("div");
-    row.className = "item change update" + (u.selected ? "" : " off");
-    row.innerHTML = `
-      <input type="checkbox" ${u.selected ? "checked" : ""} aria-label="Apply this update">
-      <div class="fields">
-        <div class="sub">${refLink(u)} · currently</div>
-        <div class="old"><b>${esc(u.old_title)}</b>\n${esc(u.old_description || "(no description)")}</div>
-        <div class="label">New title</div>
-        <input type="text" value="${esc(u.title)}">
-        <div class="label">New description</div>
-        <textarea rows="4">${esc(u.description)}</textarea>
-      </div>`;
-    const check = row.querySelector("input[type=checkbox]");
-    check.addEventListener("change", () => { u.selected = check.checked; row.classList.toggle("off", !u.selected); updateTaskCount(); });
-    row.querySelector("input[type=text]").addEventListener("input", (e) => { u.title = e.target.value; });
-    row.querySelector("textarea").addEventListener("input", (e) => { u.description = e.target.value; });
-    list.appendChild(row);
-  });
-}
-
-function renderDeletions() {
-  const list = $("deletions");
-  list.innerHTML = "";
-  $("deletions-box").classList.toggle("hidden", !deletions.length);
-  deletions.forEach((d) => {
-    const row = document.createElement("div");
-    row.className = "item change delete" + (d.selected ? "" : " off");
-    const isIssue = d.type === "ISSUE";
-    const modes = isIssue
-      ? `<option value="delete">Delete the issue permanently</option>
-         <option value="close">Close the issue (keep it)</option>
-         <option value="remove">Remove from the project only</option>`
-      : `<option value="remove">Remove from the project</option>`;
-    const master = d.sub_issue_count ? ` · master with ${d.sub_issue_count} sub-issue(s); they'll stay but lose their master` : "";
-    row.innerHTML = `
-      <input type="checkbox" ${d.selected ? "checked" : ""} aria-label="Apply this deletion">
-      <div class="fields">
-        <div class="title">${esc(d.title)}</div>
-        <div class="sub">${refLink(d)}${master}</div>
-        <select>${modes}</select>
-      </div>`;
-    const check = row.querySelector("input");
-    const mode = row.querySelector("select");
-    mode.value = d.mode;
-    check.addEventListener("change", () => { d.selected = check.checked; row.classList.toggle("off", !d.selected); updateTaskCount(); });
-    mode.addEventListener("change", () => { d.mode = mode.value; updateTaskCount(); });
-    list.appendChild(row);
-  });
-}
-
-function renderTasks() {
-  const list = $("tasks");
-  const why = updates.length || deletions.length
-    ? "No new subtasks proposed."
-    : "No new subtasks needed: the tasks you ticked already cover this document.";
-  list.innerHTML = tasks.length ? "" : `<div class="empty">${why} Use "+ Add subtask" to add one yourself.</div>`;
-  tasks.forEach((t, i) => {
-    const row = document.createElement("div");
-    row.className = "item task" + (t.selected ? "" : " off");
-    row.innerHTML = `
-      <span class="num">${i + 1}</span>
-      <input type="checkbox" ${t.selected ? "checked" : ""} aria-label="Include subtask ${i + 1}">
-      <div class="fields">
-        <input type="text" value="${esc(t.title)}" placeholder="Subtask title">
-        <textarea rows="2" placeholder="Description">${esc(t.description)}</textarea>
-      </div>
-      <button class="link remove" title="Remove">✕</button>`;
-    const [check, title] = row.querySelectorAll("input");
-    check.addEventListener("change", () => { t.selected = check.checked; row.classList.toggle("off", !t.selected); updateTaskCount(); });
-    title.addEventListener("input", () => { t.title = title.value; updateTaskCount(); });
-    row.querySelector("textarea").addEventListener("input", (e) => { t.description = e.target.value; });
-    row.querySelector(".remove").addEventListener("click", () => { tasks.splice(i, 1); renderTasks(); });
-    list.appendChild(row);
-  });
-  updateTaskCount();
-}
-
-function renderMasterChoice() {
-  const box = $("existing-master-box");
-  if (existingMaster && useExistingMaster) {
-    const m = existingMaster;
-    box.innerHTML = `New subtasks go under the existing master <a href="${m.url}" target="_blank" rel="noopener">#${m.number}</a> <b>${esc(m.title)}</b> ` +
-      `(${m.sub_issue_count} sub-issue${m.sub_issue_count === 1 ? "" : "s"} now). No new master will be created. ` +
-      `<button class="link" id="switch-new">Create a new master instead</button>`;
-    box.querySelector("#switch-new").addEventListener("click", () => { useExistingMaster = false; renderMasterChoice(); });
-  } else if (existingMaster) {
-    box.innerHTML = `A new master will be created. <button class="link" id="switch-existing">Add to #${existingMaster.number} instead</button>`;
-    box.querySelector("#switch-existing").addEventListener("click", () => { useExistingMaster = true; renderMasterChoice(); });
-  }
-  updateTaskCount();
-}
-
-function chosen() { return tasks.filter(t => t.selected && t.title.trim()); }
-function chosenUpdates() { return updates.filter(u => u.selected && u.description.trim()); }
-function chosenDeletions() { return deletions.filter(d => d.selected); }
-
-function updateTaskCount() {
-  const n = chosen().length, nu = chosenUpdates().length, nd = chosenDeletions().length;
-  $("task-count").textContent = `${n} of ${tasks.length} selected`;
-  $("update-count").textContent = `${nu} of ${updates.length} selected`;
-  $("delete-count").textContent = `${nd} of ${deletions.length} selected`;
-
-  // Master choice only matters when new subtasks will be created.
-  $("existing-master-box").classList.toggle("hidden", !existingMaster || !n);
-  $("new-master-box").classList.toggle("hidden", useExistingMaster || !n);
-
-  const parts = [];
-  if (n) parts.push(useExistingMaster ? `create ${n} sub-issue(s) under #${existingMaster.number}`
-                                      : `create a master issue with ${n} sub-issue(s)`);
-  if (nu) parts.push(`update ${nu} task(s)`);
-  if (nd) parts.push(`remove ${nd} task(s)`);
-  $("publish-lead").textContent = parts.length
-    ? `This will ${parts.join(", ")}. New issues are added to the project.`
-    : "Nothing selected yet.";
-
-  const total = n + nu + nd;
-  $("create").textContent = total ? `Apply ${total} change${total === 1 ? "" : "s"} to GitHub` : "Apply to GitHub";
-  $("create").disabled = total === 0;
-}
-
-$("select-all").addEventListener("click", () => { tasks.forEach(t => t.selected = true); renderTasks(); });
-$("select-none").addEventListener("click", () => { tasks.forEach(t => t.selected = false); renderTasks(); });
-$("add-task").addEventListener("click", () => {
-  tasks.push({ title: "", description: "", selected: true });
-  renderTasks();
-  const inputs = $("tasks").querySelectorAll(".task input[type=text]");
-  inputs[inputs.length - 1].focus();
-});
-
-// ---------- 5. apply ----------
-const MODE_TEXT = { delete: "DELETED PERMANENTLY", close: "closed", remove: "removed from the project" };
-
-$("create").addEventListener("click", async () => {
-  const selected = chosen(), ups = chosenUpdates(), dels = chosenDeletions();
-  if (selected.length && !useExistingMaster && !$("master-title").value.trim()) {
-    showError("create-error", "The master task needs a title."); return;
-  }
-  const lines = [];
-  if (selected.length) lines.push(useExistingMaster
-    ? `• Create ${selected.length} sub-issue(s) under #${existingMaster.number}`
-    : `• Create 1 master issue and ${selected.length} sub-issue(s)`);
-  for (const u of ups) lines.push(`• Update #${u.number}: ${u.title}`);
-  for (const d of dels) lines.push(`• #${d.number} ${d.title} will be ${MODE_TEXT[d.mode]}`);
-  if (dels.some(d => d.mode === "delete")) lines.push("", "Deleted issues can't be recovered.");
-  if (!confirm(`Apply these changes to GitHub?\n\n${lines.join("\n")}`)) return;
-
-  hide("create-error"); hide("create-result");
-  busy("create", "Applying…");
-  try {
-    const res = await postJson("/api/create", {
-      master_title: $("master-title").value,
-      master_description: $("master-description").value,
-      tasks: selected.map(({ title, description }) => ({ title, description })),
-      repo: $("repo").value,
-      status: $("status").value,
-      existing_master: useExistingMaster && selected.length ? existingMaster : null,
-      updates: ups.map(({ item_id, title, description }) => ({ item_id, title, description })),
-      deletions: dels.map(({ item_id, mode }) => ({ item_id, mode })),
-    });
-    const link = (i) => i.url ? `<a href="${i.url}" target="_blank" rel="noopener">#${i.number}</a>` : `#${i.number}`;
-    let html = "";
-    if (res.subtasks.length) {
-      html += (res.existing_master
-        ? `Added ${res.subtasks.length} sub-issue(s) to the existing master ${link(res.master)}:`
-        : `Created master issue ${link(res.master)} with ${res.subtasks.length} sub-issue(s):`) +
-        `<ul class="results">${res.subtasks.map((s, i) => `<li>${link(s)} ${esc(selected[i].title)}</li>`).join("")}</ul>`;
+    // The document is read first, so the message can already refer to it.
+    if (file && !(await loadDocument(file))) return;
+    if (text) {
+      await runJob(() => postJson("/api/agent/message", {
+        session_id: sessionId, text, selected_ids: [...selected.keys()], edits,
+      }));
     }
-    if (res.updated.length) html += `Updated:<ul class="results">${res.updated.map(u => `<li>${link(u)} ${esc(u.title)}</li>`).join("")}</ul>`;
-    if (res.removed.length) html += `Removed:<ul class="results">${res.removed.map(r => `<li>#${r.number} ${esc(r.title)} (${MODE_TEXT[r.mode]})</li>`).join("")}</ul>`;
-    if (html) { $("create-result").innerHTML = html; show("create-result"); }
-    if (res.errors.length) showError("create-error", res.errors.join("\n"));
-    // Drop what was applied so it can't be applied twice; failed changes stay for another try.
-    const done = new Set([...res.updated, ...res.removed].map(x => x.item_id));
-    if (res.subtasks.length) tasks = tasks.filter(t => !selected.includes(t));
-    updates = updates.filter(u => !done.has(u.item_id));
-    deletions = deletions.filter(d => !done.has(d.item_id));
-    renderUpdates(); renderDeletions(); renderTasks();
-  } catch (err) {
-    showError("create-error", err.message);
   } finally {
-    updateTaskCount();
+    setBusy(false);
+    input.focus();
   }
-});
+}
 
-// ---------- helpers ----------
-async function pollJob(jobId, logId) {
+async function runJob(start, onDone) {
+  const progress = agentShell();
+  progress.bubble.innerHTML = `<div class="progress"><div class="live">Working…</div></div>`;
+  try {
+    const { job_id } = await start();
+    const result = await pollJob(job_id, progress.bubble);
+    progress.el.remove();
+    for (const reply of result.replies) agentMessage(reply);
+    if (onDone) onDone();
+    return true;
+  } catch (err) {
+    progress.el.remove();
+    agentMessage({ type: "error", text: err.message });
+    return false;
+  }
+}
+
+async function pollJob(jobId, bubble) {
   while (true) {
     const job = await getJson(`/api/jobs/${jobId}`);
-    $(logId).innerHTML = job.log.map((l, i) =>
-      `<div class="${job.status === "running" && i === job.log.length - 1 ? "live" : ""}">${esc(l)}</div>`).join("");
+    if (job.log.length) {
+      bubble.innerHTML = `<div class="progress">${job.log.map((l, i) =>
+        `<div class="${job.status === "running" && i === job.log.length - 1 ? "live" : ""}">${esc(l)}</div>`).join("")}</div>`;
+      scrollDown();
+    }
     if (job.status === "done") return job.result;
     if (job.status === "error") throw new Error(job.error);
-    await new Promise(r => setTimeout(r, 1000));
+    await new Promise(r => setTimeout(r, 800));
   }
 }
+
+// ---------- messages ----------
+function userMessage(text) {
+  const el = document.createElement("div");
+  el.className = "msg user";
+  el.innerHTML = `<div class="bubble">${esc(text).replace(/\[(SEARCH|TASKS?|MERGE|SPLIT|ADD|HELP|UPDATE|DELETE)\]/gi,
+    (m) => `<span class="token">${m.toUpperCase()}</span>`)}</div>`;
+  $("log").appendChild(el);
+  scrollDown();
+}
+
+function agentShell(kind = "") {
+  const el = document.createElement("div");
+  el.className = "msg agent " + kind;
+  el.innerHTML = `<div class="avatar">AI</div><div class="bubble"></div>`;
+  $("log").appendChild(el);
+  scrollDown();
+  return { el, bubble: el.querySelector(".bubble") };
+}
+
+function agentMessage(reply) {
+  const { el, bubble } = agentShell(reply.type === "error" ? "error" : "");
+  bubble.innerHTML = md(reply.text || "");
+  if (reply.type === "search") renderSearch(bubble, reply);
+  if (reply.type === "proposal") renderProposal(el, bubble, reply);
+  if (reply.type === "added") renderAdded(bubble, reply);
+  scrollDown();
+}
+
+// ---------- [SEARCH] results ----------
+function renderSearch(bubble, reply) {
+  const list = document.createElement("div");
+  list.className = "items";
+  for (const r of reply.results) {
+    if (r.selected) selected.set(r.item_id, { number: r.number, title: r.title });
+    const row = document.createElement("label");
+    row.className = "item" + (selected.has(r.item_id) ? " picked" : "");
+    row.dataset.itemId = r.item_id;
+    const ref = r.url ? `<a href="${r.url}" target="_blank" rel="noopener">#${r.number}</a>` : (r.number ? `#${r.number}` : "draft");
+    const master = r.sub_issue_count ? `<span class="badge master">master · ${r.sub_issue_count} sub-issues</span>` : "";
+    const done = r.is_done ? `<span class="badge">done</span>` : "";
+    const status = r.status ? `<span class="badge">${esc(r.status)}</span>` : "";
+    const parent = r.parent ? ` · sub-issue of #${r.parent.number}` : "";
+    row.innerHTML = `
+      <input type="checkbox" ${selected.has(r.item_id) ? "checked" : ""}>
+      <div class="fields">
+        <div class="title">${esc(r.title)}<span class="badge ${r.strength}" title="Similarity score">${r.strength} match · ${Math.round(Math.max(0, r.score) * 100)}%</span>${master}${status}${done}</div>
+        <div class="sub">${ref}${parent}</div>
+        ${r.body ? `<div class="snippet">${esc(r.body)}</div>` : ""}
+      </div>`;
+    row.querySelector("input").addEventListener("change", (e) => {
+      if (e.target.checked) selected.set(r.item_id, { number: r.number, title: r.title });
+      else selected.delete(r.item_id);
+      syncSelection();
+    });
+    list.appendChild(row);
+  }
+  bubble.appendChild(list);
+  if (reply.results.length > 1) {
+    const actions = document.createElement("div");
+    actions.className = "card-actions";
+    actions.innerHTML = `<button class="link">Select all</button><button class="link">Select none</button>`;
+    const [all, none] = actions.querySelectorAll("button");
+    all.addEventListener("click", () => { reply.results.forEach(r => selected.set(r.item_id, { number: r.number, title: r.title })); syncSelection(); });
+    none.addEventListener("click", () => { reply.results.forEach(r => selected.delete(r.item_id)); syncSelection(); });
+    bubble.appendChild(actions);
+  }
+  syncSelection();
+}
+
+// The same task can appear in several search results: keep every checkbox in sync.
+function syncSelection() {
+  document.querySelectorAll(".item[data-item-id]").forEach(row => {
+    const on = selected.has(row.dataset.itemId);
+    row.classList.toggle("picked", on);
+    row.querySelector("input").checked = on;
+  });
+  updateContext();
+}
+
+// ---------- [TASK] proposal ----------
+function renderProposal(el, bubble, reply) {
+  if (latestProposal) markStale(latestProposal, "Replaced by newer tasks below.");
+  const state = {
+    data: reply, el, stale: false,
+    useExistingMaster: !!reply.master,
+    tasks: reply.tasks.map(t => ({ ...t, selected: true })),
+    updates: reply.updates.map(u => ({ ...u, selected: true })),
+    deletions: reply.deletions.map(d => ({ ...d, selected: true, mode: d.type === "ISSUE" ? "delete" : "remove" })),
+  };
+  latestProposal = state;
+
+  if (reply.warnings.length) {
+    bubble.insertAdjacentHTML("beforeend", `<ul class="warnings">${reply.warnings.map(w => `<li>${esc(w)}</li>`).join("")}</ul>`);
+  }
+  if (reply.merged) {
+    bubble.insertAdjacentHTML("beforeend", `<div class="notice">Merged ${reply.merged.from.map(t => `<s>${esc(t)}</s>`).join(" + ")}
+      → task ${reply.merged.position}: <b>${esc(reply.merged.title)}</b></div>`);
+  }
+  if (reply.revision && reply.revision.removed.length) {
+    // The model can be wrong about what an update makes unnecessary: let the user restore tasks.
+    bubble.insertAdjacentHTML("beforeend", `<div class="section">Removed by the update</div><ul class="removed"></ul>`);
+    const ul = bubble.querySelector("ul.removed:last-of-type");
+    reply.revision.removed.forEach((r) => {
+      const li = document.createElement("li");
+      li.innerHTML = `<s>${esc(r.title)}</s> <span class="sub">${esc(r.reason)}</span> <button class="link">Restore</button>`;
+      li.querySelector("button").addEventListener("click", () => {
+        state.tasks.push({ title: r.title, description: r.description || "", selected: true });
+        li.remove();
+        state.rerender();
+        updateContext();
+      });
+      ul.appendChild(li);
+    });
+  }
+  if (reply.split) {
+    for (const r of reply.split) {
+      const dropped = r.dropped.length
+        ? `<div class="sub">Left out (overlaps another task): ${r.dropped.map(d =>
+            `<s>${esc(d.title)}</s> ~ ${d.overlaps.url ? `<a href="${d.overlaps.url}" target="_blank" rel="noopener">${esc(d.overlaps.label)}</a>` : esc(d.overlaps.label)} ${esc(d.overlaps.title)}`).join("; ")}</div>` : "";
+      bubble.insertAdjacentHTML("beforeend", r.split
+        ? `<div class="notice">Split <s>${esc(r.from)}</s> → tasks ${r.position}–${r.position + r.parts.length - 1}${dropped}</div>`
+        : `<div class="notice">Kept <b>${esc(r.from)}</b>: it couldn't be split without overlapping other tasks.${dropped}</div>`);
+    }
+  }
+  if (reply.removed && reply.removed.length) {
+    const link = (i) => i.url ? `<a href="${i.url}" target="_blank" rel="noopener">#${i.number}</a>` : `#${i.number}`;
+    bubble.insertAdjacentHTML("beforeend", `<div class="section">Removed (already in the project)</div>
+      <ul class="removed">${reply.removed.map(r =>
+        `<li><s>${esc(r.title)}</s> <span class="sub">overlaps ${link(r.overlaps)} ${esc(r.overlaps.title)}</span></li>`).join("")}</ul>`);
+  }
+
+  // Where the new tasks go
+  const masterBox = document.createElement("div");
+  bubble.appendChild(masterBox);
+  const renderMaster = () => {
+    if (state.useExistingMaster) {
+      const m = reply.master;
+      masterBox.innerHTML = `<div class="notice">New tasks go under the existing master
+        <a href="${m.url}" target="_blank" rel="noopener">#${m.number}</a> <b>${esc(m.title)}</b>.
+        <button class="link">Create a new master instead</button></div>`;
+      masterBox.querySelector("button").addEventListener("click", () => { state.useExistingMaster = false; renderMaster(); });
+    } else {
+      masterBox.innerHTML = `<div class="section">New master task</div>
+        <div class="fields" style="margin-top:6px"><input type="text" value="${esc(state.masterTitle ?? reply.master_title)}"></div>
+        ${reply.master ? `<button class="link">Use existing master #${reply.master.number} instead</button>` : ""}`;
+      masterBox.querySelector("input").addEventListener("input", (e) => { state.masterTitle = e.target.value; });
+      const back = masterBox.querySelector("button");
+      if (back) back.addEventListener("click", () => { state.useExistingMaster = true; renderMaster(); });
+    }
+  };
+  renderMaster();
+
+  if (state.updates.length) {
+    bubble.insertAdjacentHTML("beforeend", `<div class="section">Tasks to update</div>`);
+    const list = document.createElement("div"); list.className = "items"; bubble.appendChild(list);
+    for (const u of state.updates) {
+      const row = document.createElement("div");
+      row.className = "item update";
+      row.innerHTML = `<input type="checkbox" checked>
+        <div class="fields"><div class="sub">#${u.number} now:</div>
+          <div class="old"><b>${esc(u.old_title)}</b>\n${esc(u.old_description || "(no description)")}</div>
+          <input type="text" value="${esc(u.title)}"><textarea rows="3">${esc(u.description)}</textarea></div>`;
+      bindRow(row, u, () => updateContext());
+      list.appendChild(row);
+    }
+  }
+  if (state.deletions.length) {
+    bubble.insertAdjacentHTML("beforeend", `<div class="section">Tasks to delete</div>`);
+    const list = document.createElement("div"); list.className = "items"; bubble.appendChild(list);
+    for (const d of state.deletions) {
+      const row = document.createElement("div");
+      row.className = "item delete";
+      const modes = d.type === "ISSUE"
+        ? `<option value="delete">Delete permanently</option><option value="close">Close the issue</option><option value="remove">Remove from project only</option>`
+        : `<option value="remove">Remove from project</option>`;
+      row.innerHTML = `<input type="checkbox" checked>
+        <div class="fields"><div class="title">#${d.number} ${esc(d.title)}</div><select>${modes}</select></div>`;
+      row.querySelector("select").value = d.mode;
+      row.querySelector("select").addEventListener("change", (e) => { d.mode = e.target.value; });
+      bindRow(row, d, () => updateContext());
+      list.appendChild(row);
+    }
+  }
+
+  bubble.insertAdjacentHTML("beforeend", `<div class="section">New tasks</div>`);
+  const list = document.createElement("div"); list.className = "items"; bubble.appendChild(list);
+  const renderTasks = () => {
+    list.innerHTML = state.tasks.length ? "" : `<div class="sub">No new tasks.</div>`;
+    state.tasks.forEach((t, i) => {
+      const row = document.createElement("div");
+      row.className = "item" + (t.selected ? "" : " off");
+      const isMerged = reply.merged && i === reply.merged.position - 1 && t.title === reply.merged.title;
+      const change = reply.revision && reply.revision.changes[i] && t.title === reply.tasks[i]?.title
+        ? reply.revision.changes[i] : null;
+      const splitFrom = (reply.split || []).find(r => r.split && i >= r.position - 1 && i < r.position - 1 + r.parts.length && r.parts.includes(t.title));
+      row.innerHTML = `<span class="num">${i + 1}</span><input type="checkbox" ${t.selected ? "checked" : ""}>
+        <div class="fields">${isMerged ? `<span class="badge master" style="margin:0 0 4px">merged</span>` : ""}${splitFrom ? `<span class="badge master" style="margin:0 0 4px" title="Split from: ${esc(splitFrom.from)}">split</span>` : ""}${change && change !== "kept" ? `<span class="badge ${change === "new" ? "strong" : "possible"}" style="margin:0 0 4px">${change}</span>` : ""}
+          <input type="text" value="${esc(t.title)}" placeholder="Task title">
+          <textarea rows="2" placeholder="Description">${esc(t.description)}</textarea></div>
+        <button class="link" title="Remove">✕</button>`;
+      bindRow(row, t, () => updateContext());
+      row.querySelector("button").addEventListener("click", () => { state.tasks.splice(i, 1); renderTasks(); updateContext(); });
+      list.appendChild(row);
+    });
+  };
+  renderTasks();
+  state.rerender = renderTasks;
+
+  const actions = document.createElement("div");
+  actions.className = "card-actions";
+  actions.innerHTML = `<button class="link">+ Add a task</button><span style="flex:1"></span><button class="primary">[ADD] to GitHub</button>`;
+  const [addTask, addAll] = actions.querySelectorAll("button");
+  addTask.addEventListener("click", () => { state.tasks.push({ title: "", description: "", selected: true }); renderTasks(); });
+  // Only "[ADD]": a file staged for later stays staged.
+  addAll.addEventListener("click", () => { input.value = "[ADD]"; send({ withFile: false }); });
+  bubble.appendChild(actions);
+  updateContext();
+}
+
+function bindRow(row, obj, onChange) {
+  const check = row.querySelector("input[type=checkbox]");
+  check.addEventListener("change", () => { obj.selected = check.checked; row.classList.toggle("off", !obj.selected); onChange(); });
+  const title = row.querySelector("input[type=text]");
+  if (title) title.addEventListener("input", (e) => { obj.title = e.target.value; onChange(); });
+  const desc = row.querySelector("textarea");
+  if (desc) desc.addEventListener("input", (e) => { obj.description = e.target.value; });
+}
+
+function markStale(state, note) {
+  if (state.stale) return;
+  state.stale = true;
+  const bubble = state.el.querySelector(".bubble");
+  bubble.classList.add("stale");
+  bubble.insertAdjacentHTML("beforeend", `<div class="stale-note">${esc(note)}</div>`);
+}
+
+function collectEdits(state) {
+  return {
+    proposal_id: state.data.proposal_id,
+    use_existing_master: state.useExistingMaster,
+    master_title: state.masterTitle ?? state.data.master_title,
+    master_description: state.data.master_description,
+    tasks: state.tasks.filter(t => t.selected && t.title.trim()).map(({ title, description }) => ({ title, description })),
+    updates: state.updates.filter(u => u.selected).map(({ item_id, title, description }) => ({ item_id, title, description })),
+    deletions: state.deletions.filter(d => d.selected).map(({ item_id, mode }) => ({ item_id, mode })),
+  };
+}
+
+function describeEdits(edits) {
+  const lines = [];
+  const where = latestProposal.useExistingMaster && latestProposal.data.master
+    ? `under #${latestProposal.data.master.number}` : `under a new master "${edits.master_title}"`;
+  if (edits.tasks.length) lines.push(`• Create ${edits.tasks.length} task(s) ${where}`);
+  for (const u of edits.updates) lines.push(`• Update #${(latestProposal.updates.find(x => x.item_id === u.item_id) || {}).number}: ${u.title}`);
+  for (const d of edits.deletions) {
+    const item = latestProposal.deletions.find(x => x.item_id === d.item_id) || {};
+    lines.push(`• #${item.number} ${item.title} will be ${MODE_TEXT[d.mode]}`);
+  }
+  if (edits.deletions.some(d => d.mode === "delete")) lines.push("", "Deleted issues can't be recovered.");
+  return lines.join("\n");
+}
+
+// ---------- [ADD] result ----------
+function renderAdded(bubble, reply) {
+  if (latestProposal) markStale(latestProposal, "Added to GitHub.");
+  const link = (i) => i.url ? `<a href="${i.url}" target="_blank" rel="noopener">#${i.number}</a>` : `#${i.number}`;
+  let html = "";
+  if (reply.subtasks.length) html += `<ul class="results">${reply.subtasks.map(s => `<li>${link(s)} ${esc(s.title)}</li>`).join("")}</ul>`;
+  if (reply.master && reply.subtasks.length) html = `<div class="sub" style="margin-top:6px">Master: ${link(reply.master)} ${esc(reply.master.title || "")}</div>` + html;
+  if (reply.updated.length) html += `<div class="sub">Updated: ${reply.updated.map(link).join(", ")}</div>`;
+  if (reply.removed.length) html += `<div class="sub">Removed: ${reply.removed.map(r => `#${r.number} (${MODE_TEXT[r.mode]})`).join(", ")}</div>`;
+  if (reply.errors.length) html += `<ul class="warnings">${reply.errors.map(e => `<li>${esc(e)}</li>`).join("")}</ul>`;
+  bubble.insertAdjacentHTML("beforeend", html);
+  latestProposal = null;
+  updateContext();
+}
+
+// ---------- context bar ----------
+function updateContext() {
+  const doc = $("ctx-doc");
+  doc.textContent = !documents.length ? "No document"
+    : `📄 ${documents[0]}` + (documents.length > 1
+        ? ` + ${documents.length - 1} update${documents.length > 2 ? "s" : ""} (${documents.slice(1).join(", ")})` : "");
+  doc.title = documents.join(" → ");
+  doc.classList.toggle("on", documents.length > 0);
+
+  const sel = $("ctx-selected");
+  sel.innerHTML = selected.size
+    ? `✓ ${selected.size} task${selected.size === 1 ? "" : "s"} selected: ${[...selected.values()].map(s => "#" + s.number).join(", ")}<button title="Clear selection">✕</button>`
+    : "0 tasks selected";
+  sel.classList.toggle("on", selected.size > 0);
+  const clear = sel.querySelector("button");
+  if (clear) clear.addEventListener("click", () => { selected.clear(); syncSelection(); });
+
+  const prop = $("ctx-proposal");
+  if (latestProposal && !latestProposal.stale) {
+    const n = latestProposal.tasks.filter(t => t.selected && t.title.trim()).length;
+    prop.textContent = `📝 ${n} generated task${n === 1 ? "" : "s"} ready for [ADD]`;
+    prop.classList.add("on");
+  } else {
+    prop.textContent = "No generated tasks";
+    prop.classList.remove("on");
+  }
+}
+
+// ---------- helpers ----------
+function scrollDown() { const s = $("scroller"); s.scrollTop = s.scrollHeight; }
 async function getJson(url) { return handle(await fetch(url)); }
 async function postForm(url, body) { return handle(await fetch(url, { method: "POST", body })); }
 async function postJson(url, data) {
@@ -618,12 +620,18 @@ async function handle(res) {
   if (!res.ok) throw new Error(data.error || `Server error (${res.status})`);
   return data;
 }
-function busy(id, text) { $(id).disabled = true; $(id).textContent = text; }
-function idle(id, text) { $(id).disabled = false; $(id).textContent = text; }
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
-function show(id) { $(id).classList.remove("hidden"); }
-function hide(id) { $(id).classList.add("hidden"); }
-function showError(id, text) { $(id).textContent = text; show(id); }
+// Tiny markdown: **bold**, `code`, "- " bullet lines, line breaks.
+function md(text) {
+  const lines = esc(text).split("\n");
+  let html = "", inList = false;
+  for (const line of lines) {
+    const fmt = line.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/`(.+?)`/g, "<code>$1</code>");
+    if (/^- /.test(line)) { if (!inList) { html += "<ul>"; inList = true; } html += `<li>${fmt.slice(2)}</li>`; }
+    else { if (inList) { html += "</ul>"; inList = false; } html += fmt ? `<p>${fmt}</p>` : "<p>&nbsp;</p>"; }
+  }
+  return html + (inList ? "</ul>" : "");
+}
 </script>
 </body>
 </html>
